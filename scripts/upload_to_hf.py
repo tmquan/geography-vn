@@ -353,6 +353,66 @@ geometry.
 | Commune polygons (GeoJSON)            | **{stats['n_geo_polygons'].get('communes', 0):,}** |
 | Max merger fanout (predecessor units) | **{stats['merger_fanout_max']}**            |
 
+## Representative figures
+
+A curated tour of the dataset, one figure per pack. Each embed below is
+the **static PNG**; the matching `.html` next to it is the
+**fully-interactive Plotly version** (pan / zoom / hover tooltips /
+legend toggle).
+
+### Cartographic pack — population by post-merger province
+
+![Vietnam population choropleth, 2024](figures/maps/01_provinces_population.png)
+
+NVIDIA-green sequential scale. The two dashed boxes on the right declare
+the offshore archipelagos **Quần đảo Hoàng Sa** (administered by Đà
+Nẵng) and **Quần đảo Trường Sa** (administered by Khánh Hòa) following
+standard Vietnamese-atlas convention. Interactive:
+[`figures/maps/01_provinces_population.html`](figures/maps/01_provinces_population.html).
+
+### Cartographic pack — 3,321 communes by macro-region
+
+![3,321 communes by centroid, post-merger](figures/maps/04_communes_scatter.png)
+
+One dot per surviving commune-level admin unit; colour by GSO macro-region.
+Interactive: [`figures/maps/04_communes_scatter.html`](figures/maps/04_communes_scatter.html).
+
+### Analytical pack — 34 provinces by population
+
+![34 provinces by population](figures/analysis/03_province_population.png)
+
+Sorted bar chart; colour by macro-region. TPHCM (post-merger:
+14.0 M) and Hà Nội (8.8 M) dominate; the long tail
+runs into Northern-Midlands provinces with under 2 M people.
+Interactive: [`figures/analysis/03_province_population.html`](figures/analysis/03_province_population.html).
+
+### Analytical pack — commune merger fanout
+
+![Commune merger fanout](figures/analysis/08_merger_fanout_communes.png)
+
+How many predecessor wards / xã were absorbed by each surviving commune.
+Modal value 3; max value **16** (Phường Văn Miếu - Quốc Tử Giám in
+Hà Nội). Interactive:
+[`figures/analysis/08_merger_fanout_communes.html`](figures/analysis/08_merger_fanout_communes.html).
+
+### Analytical pack — curator UMAP × macro-region
+
+![Curator UMAP coloured by macro-region](figures/analysis/12_curator_umap_region.png)
+
+Sentence-transformers (`paraphrase-multilingual-MiniLM-L12-v2`, 384-d)
+embedding of every entity's merger-lineage descriptor, projected to 2-D
+with UMAP (cosine, 15 neighbours, `min_dist=0.1`). The macro-region
+lobes emerge **from the embedding alone** — the model has never seen
+the macro-region label. Interactive:
+[`figures/analysis/12_curator_umap_region.html`](figures/analysis/12_curator_umap_region.html).
+
+### Full inventory — 17 figures
+
+| Pack          | Files                                          | Style                                       |
+| ------------- | ---------------------------------------------- | ------------------------------------------- |
+| `figures/maps/`        | 5 PNG + 5 HTML pairs (1100 × 1100 each)        | NVIDIA Sans + dual-archipelago declaration  |
+| `figures/analysis/`    | 12 PNG + 12 HTML pairs (1200 × 900 each)       | LaTeX-serif + NVIDIA-green palette          |
+
 ## What's on the Hub
 
 ```
@@ -369,7 +429,9 @@ geometry.
 │   └── communes.geojson       3,321 polygons (FeatureCollection)
 ├── reduced/
 │   └── reduced.parquet        UMAP 2-D coords + HDBSCAN cluster id
-├── figures/analysis/          14 PNG + 14 HTML interactive Plotly figures
+├── figures/
+│   ├── analysis/              12 PNG + 12 HTML pairs (LaTeX-serif theme)
+│   └── maps/                   5 PNG +  5 HTML pairs (NVIDIA Sans + archipelagos)
 ├── notebooks/DATAANALYSIS.ipynb
 ├── docs/{{DATAPROCESSING,DATAANALYSIS}}.md
 └── raw/{{admin_units,committees}}.json   (source listings)
@@ -457,7 +519,17 @@ Authoritative legal sources for the merger:
 * Government decrees published at <https://vanban.chinhphu.vn>
 
 If this mirror or the analytical figures are useful in academic work,
-please credit the publishers above.
+please cite:
+
+```bibtex
+@misc{nso_2026,
+  title        = {Sáp Nhập},
+  author       = {TMQuan},
+  year         = {2026},
+  howpublished = {\\url{https://huggingface.co/datasets/tmquan/sapnhap-bando-vn}},
+  note         = {Mirror of the atlas corpus published at https://sapnhap.bando.com.vn/ }
+}
+```
 """.strip()
 
     (HF_DIR / "README.md").write_text(body, encoding="utf-8")
