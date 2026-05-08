@@ -522,7 +522,7 @@ If this mirror or the analytical figures are useful in academic work,
 please cite:
 
 ```bibtex
-@misc{nso_2026,
+@misc{merge_2026,
   title        = {Sáp Nhập},
   author       = {TMQuan},
   year         = {2026},
