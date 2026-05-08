@@ -130,23 +130,30 @@ def consolidate() -> dict[str, Any]:
     ensure_dir(HF_REDUCED_DIR)
     ensure_dir(HF_RAW_DIR)
 
-    # --- per-kind splits (preserves WKT geom column) -----------------------
+    # --- assemble GeoJSON FeatureCollections per kind FIRST ---------------
+    # (the parquet build below uses the same df but drops the WKT column,
+    # so we capture the polygons here while ``df`` still has them).
+    n_geo = _build_geojson(df)
+    log.info("  geojson: %d provinces, %d communes",
+              n_geo["provinces"], n_geo["communes"])
+
+    # --- per-kind + union parquets (WKT dropped) --------------------------
+    # The HuggingFace dataset viewer caps rows at ~100 KB; the largest
+    # commune polygons (Đặc khu Vân Đồn, Xã Kiên Lương, …) emit WKT
+    # strings of 300–700 KB. Strip the column from the row-oriented
+    # parquets — the polygon geometry remains downloadable from
+    # ``geo/{provinces,communes}.geojson`` for callers that need it.
+    flat = df.drop(columns=["wkt"], errors="ignore").copy()
     for kind in ("province", "commune", "committee"):
-        sub = df[df["kind"] == kind].copy()
-        # ``predecessors_list`` is a list[str]; PyArrow handles it fine.
+        sub = flat[flat["kind"] == kind].copy()
         out = HF_DATA_DIR / f"{kind}s.parquet"
         sub.to_parquet(out, compression="zstd", index=False)
         log.info("  wrote %s (%d rows)", out.relative_to(REPO_ROOT), len(sub))
 
-    df.to_parquet(HF_DATA_DIR / "all.parquet",
-                   compression="zstd", index=False)
+    flat.to_parquet(HF_DATA_DIR / "all.parquet",
+                     compression="zstd", index=False)
     log.info("  wrote %s (%d rows)",
-              (HF_DATA_DIR / "all.parquet").relative_to(REPO_ROOT), len(df))
-
-    # --- assemble GeoJSON FeatureCollections per kind ----------------------
-    n_geo = _build_geojson(df)
-    log.info("  geojson: %d provinces, %d communes",
-              n_geo["provinces"], n_geo["communes"])
+              (HF_DATA_DIR / "all.parquet").relative_to(REPO_ROOT), len(flat))
 
     # --- copy reduced.parquet (UMAP) ---------------------------------------
     reduced_pq = REDUCED_DIR / "reduced.parquet"
