@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Project-specific: curator artefacts and HF staging area.
+# Everything under data/ is regenerable by `geography-vn curate` followed by
+# `python -m scripts.upload_to_hf --no-upload`, so the published artefact
+# tree never gets committed to git (it lives on HuggingFace instead).
+data/

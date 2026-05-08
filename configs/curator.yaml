@@ -1,0 +1,100 @@
+# NeMo Curator-style 5-stage pipeline for sapnhap.bando.com.vn.
+#
+# Five stages, each reading from the previous stage's output dir and writing
+# to its own. A failure inside one stage never corrupts earlier stages.
+#
+#     download -> parse -> extract -> embed -> reduce
+#
+# Wire-compatible with NeMo Curator's ProcessingStage API: every stage class
+# in packages/curator/stages.py exposes the same setup/run/teardown lifecycle,
+# and packages/curator/pipeline.py drives them either via the in-house
+# sequential executor (default) or via NeMo Curator's `InProcessExecutor`
+# when ``--backend nemo_curator`` is passed.
+#
+# OmegaConf-style ${var} interpolations are used for path derivation so
+# every artefact directory pivots off ``dataset.root`` automatically.
+
+dataset:
+  name: "sapnhap-bando-vn"
+  root: "data/${dataset.name}"
+  raw_dir:       "${dataset.root}/raw"
+  parsed_dir:    "${dataset.root}/parsed"
+  extracted_dir: "${dataset.root}/extracted"
+  embedded_dir:  "${dataset.root}/embedded"
+  reduced_dir:   "${dataset.root}/reduced"
+
+# Stage 1 — download every admin-unit and committee, plus their GeoJSON.
+download:
+  base_url: "https://sapnhap.bando.com.vn"
+  user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0 Safari/537.36"
+  verify_ssl: true
+  request_timeout_s: 30
+  retries: 4
+  retry_backoff_s: 1.5
+  delay_between_requests_s: 0.10   # ~10 req/s; servers are happy with this
+  # When true, also pull GeoJSON polygons / point markers for every entity
+  # via /pread_json. ~6,700 calls; ~12 minutes wall time on first run, then
+  # cached. Set false for a metadata-only smoke run.
+  fetch_geometries: true
+  # When true, also pull the full attribute row via /p.co_dvhc_id for every
+  # admin unit. ~3,400 calls. Provides the merger lineage details (area,
+  # population, capital, decree number, phone, link to the official decree).
+  fetch_details: true
+  # Optional caps for fast iteration; set to 0/null for full crawl.
+  max_admin_units: 0          # 0 == all 3,355
+  max_committees: 0           # 0 == all 3,357
+
+# Stage 2 — parse: normalise Vietnamese-formatted numbers, derive geometry
+# centroids/bbox/area, canonicalise the type-prefix capitalisation
+# (Thành Phố → Thành phố, Thủ Đô → Thủ đô).
+parse:
+  min_text_chars: 0           # we keep every record; ``truocsapnhap`` can be empty
+  flatten_geojson: true       # store WKT + bbox columns instead of raw geom blob
+
+# Stage 3 — extract: keyword extraction (TF-IDF over merger-lineage prose) +
+# ontology mapping (attach NSO-aligned macro-region for every province + commune).
+extract:
+  top_keywords: 8
+  vectorizer: "tfidf"
+  ngram_range: [1, 2]
+  max_df: 0.85
+  min_df: 2
+
+# Stage 4 — embed: text -> 384-d multilingual vector.
+embed:
+  model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+  backend: "auto"
+  batch_size: 64
+  normalize: true
+  text_field: "embed_text"
+  device: "cpu"
+  max_records: null           # null = embed all ~6,700 records (~3 min on CPU)
+
+# Stage 5 — reduce: UMAP -> 2-D coordinates, optional HDBSCAN cluster column.
+reduce:
+  algorithm: "umap"
+  n_components: 2
+  n_neighbors: 15
+  min_dist: 0.1
+  metric: "cosine"
+  random_state: 20260508
+  cluster: true               # density-based HDBSCAN; -1 = noise
+
+# Stage 6 (post-curate) — visualisation theme. Read by packages/viz/style and
+# scripts/render_maps. Every figure ships in BOTH formats:
+#   * static PNG for inline embed in DATAANALYSIS.md / the HF dataset card
+#   * interactive HTML with the full Plotly toolkit (pan / zoom / hover)
+viz:
+  # NVIDIA brand palette + a LaTeX-style serif font fallback (Latin Modern
+  # Roman → Computer Modern → STIX Two Text → Times). When a viewer has
+  # NVIDIA Sans installed we still use it for the chart **labels** so the
+  # numbers and category names match NVIDIA editorial layouts; the title
+  # / annotations use the LaTeX serif for academic-paper look.
+  theme: "nvidia_latex"
+  width: 1200
+  height: 720
+  scale: 2
+  # Where rendered figures land. Two folders so the analytical pack and the
+  # geographic pack are addressable separately.
+  analysis_dir: "docs/figures/analysis"
+  maps_dir:     "docs/figures/maps"
